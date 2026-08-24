@@ -611,3 +611,111 @@ func TestIsServerStreaming(t *testing.T) {
 		})
 	}
 }
+
+func TestAnnotateMethodPreconditions(t *testing.T) {
+	reqWithOptionalMatch := &api.Message{
+		Name:    "DeleteObjectRequest",
+		Package: "google.storage.v2",
+		ID:      ".google.storage.v2.DeleteObjectRequest",
+		Fields: []*api.Field{
+			{Name: "bucket", ID: ".google.storage.v2.DeleteObjectRequest.bucket", Typez: api.TypezString},
+			{Name: "object", ID: ".google.storage.v2.DeleteObjectRequest.object", Typez: api.TypezString},
+			{Name: "if_generation_match", ID: ".google.storage.v2.DeleteObjectRequest.if_generation_match", Typez: api.TypezInt64, Optional: true},
+			{Name: "if_metageneration_match", ID: ".google.storage.v2.DeleteObjectRequest.if_metageneration_match", Typez: api.TypezInt64, Optional: true},
+		},
+	}
+	reqWithScalarMatch := &api.Message{
+		Name:    "LockBucketRetentionPolicyRequest",
+		Package: "google.storage.v2",
+		ID:      ".google.storage.v2.LockBucketRetentionPolicyRequest",
+		Fields: []*api.Field{
+			{Name: "bucket", ID: ".google.storage.v2.LockBucketRetentionPolicyRequest.bucket", Typez: api.TypezString},
+			{Name: "if_metageneration_match", ID: ".google.storage.v2.LockBucketRetentionPolicyRequest.if_metageneration_match", Typez: api.TypezInt64, Optional: false},
+		},
+	}
+	reqWithoutMatch := &api.Message{
+		Name:    "GetObjectRequest",
+		Package: "google.storage.v2",
+		ID:      ".google.storage.v2.GetObjectRequest",
+		Fields: []*api.Field{
+			{Name: "bucket", ID: ".google.storage.v2.GetObjectRequest.bucket", Typez: api.TypezString},
+			{Name: "object", ID: ".google.storage.v2.GetObjectRequest.object", Typez: api.TypezString},
+		},
+	}
+
+	methodWithOptional := &api.Method{
+		Name:         "DeleteObject",
+		ID:           ".google.storage.v2.Storage.DeleteObject",
+		InputType:    reqWithOptionalMatch,
+		InputTypeID:  ".google.storage.v2.DeleteObjectRequest",
+		OutputTypeID: ".google.protobuf.Empty",
+		ReturnsEmpty: true,
+		PathInfo:     &api.PathInfo{},
+	}
+	methodWithScalar := &api.Method{
+		Name:         "LockBucketRetentionPolicy",
+		ID:           ".google.storage.v2.Storage.LockBucketRetentionPolicy",
+		InputType:    reqWithScalarMatch,
+		InputTypeID:  ".google.storage.v2.LockBucketRetentionPolicyRequest",
+		OutputTypeID: ".google.protobuf.Empty",
+		ReturnsEmpty: true,
+		PathInfo:     &api.PathInfo{},
+	}
+	methodWithout := &api.Method{
+		Name:         "GetObject",
+		ID:           ".google.storage.v2.Storage.GetObject",
+		InputType:    reqWithoutMatch,
+		InputTypeID:  ".google.storage.v2.GetObjectRequest",
+		OutputTypeID: ".google.protobuf.Empty",
+		ReturnsEmpty: true,
+		PathInfo:     &api.PathInfo{},
+	}
+
+	service := &api.Service{
+		Name:    "Storage",
+		Package: "google.storage.v2",
+		ID:      ".google.storage.v2.Storage",
+		Methods: []*api.Method{methodWithOptional, methodWithScalar, methodWithout},
+	}
+
+	model := api.NewTestAPI([]*api.Message{reqWithOptionalMatch, reqWithScalarMatch, reqWithoutMatch}, []*api.Enum{}, []*api.Service{service})
+	if err := api.CrossReference(model); err != nil {
+		t.Fatal(err)
+	}
+	codec := newTestCodec(t, libconfig.SpecProtobuf, "storage", map[string]string{
+		"include-grpc-only-methods": "true",
+	})
+	if _, err := annotateModel(model, codec); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Verify Optional match fields
+	gotOpt := methodWithOptional.Codec.(*methodAnnotation)
+	if !gotOpt.HasPreconditions {
+		t.Errorf("methodWithOptional.HasPreconditions = false, want true")
+	}
+	wantOptExpr := "req.if_generation_match.is_some() ||\n            req.if_metageneration_match.is_some()"
+	if gotOpt.PreconditionExpr != wantOptExpr {
+		t.Errorf("methodWithOptional.PreconditionExpr mismatch:\ngot:  %q\nwant: %q", gotOpt.PreconditionExpr, wantOptExpr)
+	}
+
+	// 2. Verify Scalar match field
+	gotScalar := methodWithScalar.Codec.(*methodAnnotation)
+	if !gotScalar.HasPreconditions {
+		t.Errorf("methodWithScalar.HasPreconditions = false, want true")
+	}
+	wantScalarExpr := "req.if_metageneration_match != 0"
+	if gotScalar.PreconditionExpr != wantScalarExpr {
+		t.Errorf("methodWithScalar.PreconditionExpr mismatch:\ngot:  %q\nwant: %q", gotScalar.PreconditionExpr, wantScalarExpr)
+	}
+
+	// 3. Verify request without match fields
+	gotWithout := methodWithout.Codec.(*methodAnnotation)
+	if gotWithout.HasPreconditions {
+		t.Errorf("methodWithout.HasPreconditions = true, want false")
+	}
+	if gotWithout.PreconditionExpr != "" {
+		t.Errorf("methodWithout.PreconditionExpr = %q, want empty", gotWithout.PreconditionExpr)
+	}
+}
+

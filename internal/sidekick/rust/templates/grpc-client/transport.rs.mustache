@@ -108,6 +108,16 @@ impl super::stub::{{Codec.Name}} for {{Codec.Name}} {
         options: crate::RequestOptions,
     ) -> Result<crate::Response<{{Codec.ReturnType}}>> {
         use gaxi::{prost::ToProto, grpc::tonic::{GrpcMethod, Extensions}};
+        {{#Codec.HasPreconditions}}
+        let is_conditionally_safe = {{{Codec.PreconditionExpr}}};
+        let options = crate::idempotency::resolve_idempotency(
+            options,
+            crate::idempotency::IdempotencyPolicy::default(),
+            is_conditionally_safe,
+            true,
+        );
+        {{/Codec.HasPreconditions}}
+        {{^Codec.HasPreconditions}}
         let options = google_cloud_gax::options::internal::set_default_idempotency(
             options,
             {{! TODO(#2588) - resolve this in the model }}
@@ -118,6 +128,7 @@ impl super::stub::{{Codec.Name}} for {{Codec.Name}} {
             {{PathInfo.Codec.IsIdempotent}},
             {{/HasAutoPopulatedFields}}
         );
+        {{/Codec.HasPreconditions}}
         let extensions = {
             let mut e = Extensions::new();
             e.insert(GrpcMethod::new("{{SourceService.Package}}.{{SourceService.Name}}", "{{Name}}"));

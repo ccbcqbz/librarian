@@ -49,6 +49,8 @@ type methodAnnotation struct {
 	IsBigQueryInsertJob       bool
 	ClientSideStreaming       bool
 	ServerSideStreaming       bool
+	HasPreconditions          bool
+	PreconditionExpr          string
 }
 
 // IsBidiStreaming returns true if the method is a bidirectional streaming RPC.
@@ -333,6 +335,24 @@ func (c *codec) annotateMethod(m *api.Method) (*methodAnnotation, error) {
 		IsBigQueryInsertJob:       m.ID == ".google.cloud.bigquery.v2.JobService.InsertJob",
 		ClientSideStreaming:       m.ClientSideStreaming,
 		ServerSideStreaming:       m.ServerSideStreaming,
+	}
+
+	var matchFields []string
+	if m.InputType != nil {
+		for _, f := range m.InputType.Fields {
+			name := toSnakeNoMangling(f.Name)
+			if (strings.HasPrefix(name, "if_") && (strings.HasSuffix(name, "_match") || strings.HasSuffix(name, "_not_match"))) || name == "if_match" {
+				if f.Optional {
+					matchFields = append(matchFields, "req."+name+".is_some()")
+				} else {
+					matchFields = append(matchFields, "req."+name+" != 0")
+				}
+			}
+		}
+	}
+	if len(matchFields) > 0 {
+		annotation.HasPreconditions = true
+		annotation.PreconditionExpr = strings.Join(matchFields, " ||\n            ")
 	}
 
 	if err := c.annotateResourceNameGeneration(m, annotation); err != nil {
