@@ -633,6 +633,15 @@ func TestAnnotateMethodPreconditions(t *testing.T) {
 			{Name: "if_metageneration_match", ID: ".google.storage.v2.LockBucketRetentionPolicyRequest.if_metageneration_match", Typez: api.TypezInt64, Optional: false},
 		},
 	}
+	reqWithStringETagMatch := &api.Message{
+		Name:    "UpdateObjectRequest",
+		Package: "google.storage.v2",
+		ID:      ".google.storage.v2.UpdateObjectRequest",
+		Fields: []*api.Field{
+			{Name: "bucket", ID: ".google.storage.v2.UpdateObjectRequest.bucket", Typez: api.TypezString},
+			{Name: "if_match", ID: ".google.storage.v2.UpdateObjectRequest.if_match", Typez: api.TypezString, Optional: false},
+		},
+	}
 	reqWithoutMatch := &api.Message{
 		Name:    "GetObjectRequest",
 		Package: "google.storage.v2",
@@ -661,6 +670,15 @@ func TestAnnotateMethodPreconditions(t *testing.T) {
 		ReturnsEmpty: true,
 		PathInfo:     &api.PathInfo{},
 	}
+	methodWithStringETag := &api.Method{
+		Name:         "UpdateObject",
+		ID:           ".google.storage.v2.Storage.UpdateObject",
+		InputType:    reqWithStringETagMatch,
+		InputTypeID:  ".google.storage.v2.UpdateObjectRequest",
+		OutputTypeID: ".google.protobuf.Empty",
+		ReturnsEmpty: true,
+		PathInfo:     &api.PathInfo{},
+	}
 	methodWithout := &api.Method{
 		Name:         "GetObject",
 		ID:           ".google.storage.v2.Storage.GetObject",
@@ -675,10 +693,10 @@ func TestAnnotateMethodPreconditions(t *testing.T) {
 		Name:    "Storage",
 		Package: "google.storage.v2",
 		ID:      ".google.storage.v2.Storage",
-		Methods: []*api.Method{methodWithOptional, methodWithScalar, methodWithout},
+		Methods: []*api.Method{methodWithOptional, methodWithScalar, methodWithStringETag, methodWithout},
 	}
 
-	model := api.NewTestAPI([]*api.Message{reqWithOptionalMatch, reqWithScalarMatch, reqWithoutMatch}, []*api.Enum{}, []*api.Service{service})
+	model := api.NewTestAPI([]*api.Message{reqWithOptionalMatch, reqWithScalarMatch, reqWithStringETagMatch, reqWithoutMatch}, []*api.Enum{}, []*api.Service{service})
 	if err := api.CrossReference(model); err != nil {
 		t.Fatal(err)
 	}
@@ -709,7 +727,17 @@ func TestAnnotateMethodPreconditions(t *testing.T) {
 		t.Errorf("methodWithScalar.PreconditionExpr mismatch:\ngot:  %q\nwant: %q", gotScalar.PreconditionExpr, wantScalarExpr)
 	}
 
-	// 3. Verify request without match fields
+	// 3. Verify Non-Optional String ETag match field (!req.if_match.is_empty())
+	gotStringETag := methodWithStringETag.Codec.(*methodAnnotation)
+	if !gotStringETag.HasPreconditions {
+		t.Errorf("methodWithStringETag.HasPreconditions = false, want true")
+	}
+	wantStringETagExpr := "!req.if_match.is_empty()"
+	if gotStringETag.PreconditionExpr != wantStringETagExpr {
+		t.Errorf("methodWithStringETag.PreconditionExpr mismatch:\ngot:  %q\nwant: %q", gotStringETag.PreconditionExpr, wantStringETagExpr)
+	}
+
+	// 4. Verify request without match fields
 	gotWithout := methodWithout.Codec.(*methodAnnotation)
 	if gotWithout.HasPreconditions {
 		t.Errorf("methodWithout.HasPreconditions = true, want false")
@@ -718,4 +746,5 @@ func TestAnnotateMethodPreconditions(t *testing.T) {
 		t.Errorf("methodWithout.PreconditionExpr = %q, want empty", gotWithout.PreconditionExpr)
 	}
 }
+
 

@@ -341,9 +341,13 @@ func (c *codec) annotateMethod(m *api.Method) (*methodAnnotation, error) {
 	if m.InputType != nil {
 		for _, f := range m.InputType.Fields {
 			name := toSnakeNoMangling(f.Name)
-			if (strings.HasPrefix(name, "if_") && (strings.HasSuffix(name, "_match") || strings.HasSuffix(name, "_not_match"))) || name == "if_match" {
+			if strings.HasPrefix(name, "if_") && (strings.HasSuffix(name, "_match") || strings.HasSuffix(name, "_not_match")) {
 				if f.Optional {
 					matchFields = append(matchFields, "req."+name+".is_some()")
+				} else if f.IsString() {
+					matchFields = append(matchFields, "!req."+name+".is_empty()")
+				} else if f.IsBool() {
+					matchFields = append(matchFields, "req."+name)
 				} else {
 					matchFields = append(matchFields, "req."+name+" != 0")
 				}
