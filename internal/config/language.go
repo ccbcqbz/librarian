@@ -160,6 +160,10 @@ type RustModule struct {
 	// IncludeGrpcOnlyMethods indicates whether to include gRPC-only methods.
 	IncludeGrpcOnlyMethods bool `yaml:"include_grpc_only_methods,omitempty"`
 
+	// IdempotencyPredicate configures an opt-in method on the request struct (e.g. "is_idempotent")
+	// to evaluate dynamic idempotency.
+	IdempotencyPredicate string `yaml:"idempotency_predicate,omitempty"`
+
 	// IncludeList is a list of proto files to include (e.g., "date.proto", "expr.proto").
 	IncludeList yaml.StringSlice `yaml:"include_list,omitempty"`
 
@@ -269,6 +273,10 @@ type RustCrate struct {
 
 	// IncludeGrpcOnlyMethods indicates whether to include gRPC-only methods.
 	IncludeGrpcOnlyMethods bool `yaml:"include_grpc_only_methods,omitempty"`
+
+	// IdempotencyPredicate configures an opt-in method on the request struct (e.g. "is_idempotent")
+	// to evaluate dynamic idempotency.
+	IdempotencyPredicate string `yaml:"idempotency_predicate,omitempty"`
 
 	// IncludeStreamingMethods indicates whether to include gRPC streaming
 	// methods.

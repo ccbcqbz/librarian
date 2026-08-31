@@ -110,10 +110,10 @@ impl super::stub::{{Codec.Name}} for {{Codec.Name}} {
         use gaxi::{prost::ToProto, grpc::tonic::{GrpcMethod, Extensions}};
         let options = google_cloud_gax::options::internal::set_default_idempotency(
             options,
-            {{#Codec.HasPreconditions}}
-            {{{Codec.PreconditionExpr}}},
-            {{/Codec.HasPreconditions}}
-            {{^Codec.HasPreconditions}}
+            {{#Codec.HasIdempotencyPredicate}}
+            req.{{{Codec.IdempotencyPredicate}}}(),
+            {{/Codec.HasIdempotencyPredicate}}
+            {{^Codec.HasIdempotencyPredicate}}
             {{! TODO(#2588) - resolve this in the model }}
             {{#HasAutoPopulatedFields}}
             true,
@@ -121,7 +121,7 @@ impl super::stub::{{Codec.Name}} for {{Codec.Name}} {
             {{^HasAutoPopulatedFields}}
             {{PathInfo.Codec.IsIdempotent}},
             {{/HasAutoPopulatedFields}}
-            {{/Codec.HasPreconditions}}
+            {{/Codec.HasIdempotencyPredicate}}
         );
         let extensions = {
             let mut e = Extensions::new();

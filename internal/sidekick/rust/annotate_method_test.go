@@ -612,138 +612,66 @@ func TestIsServerStreaming(t *testing.T) {
 	}
 }
 
-func TestAnnotateMethodPreconditions(t *testing.T) {
-	reqWithOptionalMatch := &api.Message{
+func TestAnnotateMethodIdempotencyPredicate(t *testing.T) {
+	req := &api.Message{
 		Name:    "DeleteObjectRequest",
 		Package: "google.storage.v2",
 		ID:      ".google.storage.v2.DeleteObjectRequest",
 		Fields: []*api.Field{
 			{Name: "bucket", ID: ".google.storage.v2.DeleteObjectRequest.bucket", Typez: api.TypezString},
 			{Name: "object", ID: ".google.storage.v2.DeleteObjectRequest.object", Typez: api.TypezString},
-			{Name: "if_generation_match", ID: ".google.storage.v2.DeleteObjectRequest.if_generation_match", Typez: api.TypezInt64, Optional: true},
-			{Name: "if_metageneration_match", ID: ".google.storage.v2.DeleteObjectRequest.if_metageneration_match", Typez: api.TypezInt64, Optional: true},
 		},
 	}
-	reqWithScalarMatch := &api.Message{
-		Name:    "LockBucketRetentionPolicyRequest",
-		Package: "google.storage.v2",
-		ID:      ".google.storage.v2.LockBucketRetentionPolicyRequest",
-		Fields: []*api.Field{
-			{Name: "bucket", ID: ".google.storage.v2.LockBucketRetentionPolicyRequest.bucket", Typez: api.TypezString},
-			{Name: "if_metageneration_match", ID: ".google.storage.v2.LockBucketRetentionPolicyRequest.if_metageneration_match", Typez: api.TypezInt64, Optional: false},
-		},
-	}
-	reqWithStringETagMatch := &api.Message{
-		Name:    "UpdateObjectRequest",
-		Package: "google.storage.v2",
-		ID:      ".google.storage.v2.UpdateObjectRequest",
-		Fields: []*api.Field{
-			{Name: "bucket", ID: ".google.storage.v2.UpdateObjectRequest.bucket", Typez: api.TypezString},
-			{Name: "if_match", ID: ".google.storage.v2.UpdateObjectRequest.if_match", Typez: api.TypezString, Optional: false},
-		},
-	}
-	reqWithoutMatch := &api.Message{
-		Name:    "GetObjectRequest",
-		Package: "google.storage.v2",
-		ID:      ".google.storage.v2.GetObjectRequest",
-		Fields: []*api.Field{
-			{Name: "bucket", ID: ".google.storage.v2.GetObjectRequest.bucket", Typez: api.TypezString},
-			{Name: "object", ID: ".google.storage.v2.GetObjectRequest.object", Typez: api.TypezString},
-		},
-	}
-
-	methodWithOptional := &api.Method{
+	method := &api.Method{
 		Name:         "DeleteObject",
 		ID:           ".google.storage.v2.Storage.DeleteObject",
-		InputType:    reqWithOptionalMatch,
+		InputType:    req,
 		InputTypeID:  ".google.storage.v2.DeleteObjectRequest",
 		OutputTypeID: ".google.protobuf.Empty",
 		ReturnsEmpty: true,
 		PathInfo:     &api.PathInfo{},
 	}
-	methodWithScalar := &api.Method{
-		Name:         "LockBucketRetentionPolicy",
-		ID:           ".google.storage.v2.Storage.LockBucketRetentionPolicy",
-		InputType:    reqWithScalarMatch,
-		InputTypeID:  ".google.storage.v2.LockBucketRetentionPolicyRequest",
-		OutputTypeID: ".google.protobuf.Empty",
-		ReturnsEmpty: true,
-		PathInfo:     &api.PathInfo{},
-	}
-	methodWithStringETag := &api.Method{
-		Name:         "UpdateObject",
-		ID:           ".google.storage.v2.Storage.UpdateObject",
-		InputType:    reqWithStringETagMatch,
-		InputTypeID:  ".google.storage.v2.UpdateObjectRequest",
-		OutputTypeID: ".google.protobuf.Empty",
-		ReturnsEmpty: true,
-		PathInfo:     &api.PathInfo{},
-	}
-	methodWithout := &api.Method{
-		Name:         "GetObject",
-		ID:           ".google.storage.v2.Storage.GetObject",
-		InputType:    reqWithoutMatch,
-		InputTypeID:  ".google.storage.v2.GetObjectRequest",
-		OutputTypeID: ".google.protobuf.Empty",
-		ReturnsEmpty: true,
-		PathInfo:     &api.PathInfo{},
-	}
-
 	service := &api.Service{
 		Name:    "Storage",
 		Package: "google.storage.v2",
 		ID:      ".google.storage.v2.Storage",
-		Methods: []*api.Method{methodWithOptional, methodWithScalar, methodWithStringETag, methodWithout},
+		Methods: []*api.Method{method},
 	}
 
-	model := api.NewTestAPI([]*api.Message{reqWithOptionalMatch, reqWithScalarMatch, reqWithStringETagMatch, reqWithoutMatch}, []*api.Enum{}, []*api.Service{service})
+	model := api.NewTestAPI([]*api.Message{req}, []*api.Enum{}, []*api.Service{service})
 	if err := api.CrossReference(model); err != nil {
 		t.Fatal(err)
 	}
-	codec := newTestCodec(t, libconfig.SpecProtobuf, "storage", map[string]string{
+
+	// 1. When idempotency-predicate is configured:
+	codecWithPredicate := newTestCodec(t, libconfig.SpecProtobuf, "storage", map[string]string{
 		"include-grpc-only-methods": "true",
+		"idempotency-predicate":     "is_idempotent",
 	})
-	if _, err := annotateModel(model, codec); err != nil {
+	if _, err := annotateModel(model, codecWithPredicate); err != nil {
 		t.Fatal(err)
 	}
-
-	// 1. Verify Optional match fields
-	gotOpt := methodWithOptional.Codec.(*methodAnnotation)
-	if !gotOpt.HasPreconditions {
-		t.Errorf("methodWithOptional.HasPreconditions = false, want true")
+	got := method.Codec.(*methodAnnotation)
+	if !got.HasIdempotencyPredicate {
+		t.Errorf("got.HasIdempotencyPredicate = false, want true")
 	}
-	wantOptExpr := "req.if_generation_match.is_some() ||\n            req.if_metageneration_match.is_some()"
-	if gotOpt.PreconditionExpr != wantOptExpr {
-		t.Errorf("methodWithOptional.PreconditionExpr mismatch:\ngot:  %q\nwant: %q", gotOpt.PreconditionExpr, wantOptExpr)
+	if got.IdempotencyPredicate != "is_idempotent" {
+		t.Errorf("got.IdempotencyPredicate = %q, want %q", got.IdempotencyPredicate, "is_idempotent")
 	}
 
-	// 2. Verify Scalar match field
-	gotScalar := methodWithScalar.Codec.(*methodAnnotation)
-	if !gotScalar.HasPreconditions {
-		t.Errorf("methodWithScalar.HasPreconditions = false, want true")
+	// 2. When idempotency-predicate is NOT configured:
+	codecWithoutPredicate := newTestCodec(t, libconfig.SpecProtobuf, "storage", map[string]string{
+		"include-grpc-only-methods": "true",
+	})
+	if _, err := annotateModel(model, codecWithoutPredicate); err != nil {
+		t.Fatal(err)
 	}
-	wantScalarExpr := "req.if_metageneration_match != 0"
-	if gotScalar.PreconditionExpr != wantScalarExpr {
-		t.Errorf("methodWithScalar.PreconditionExpr mismatch:\ngot:  %q\nwant: %q", gotScalar.PreconditionExpr, wantScalarExpr)
+	gotDefault := method.Codec.(*methodAnnotation)
+	if gotDefault.HasIdempotencyPredicate {
+		t.Errorf("gotDefault.HasIdempotencyPredicate = true, want false")
 	}
-
-	// 3. Verify Non-Optional String ETag match field (!req.if_match.is_empty())
-	gotStringETag := methodWithStringETag.Codec.(*methodAnnotation)
-	if !gotStringETag.HasPreconditions {
-		t.Errorf("methodWithStringETag.HasPreconditions = false, want true")
-	}
-	wantStringETagExpr := "!req.if_match.is_empty()"
-	if gotStringETag.PreconditionExpr != wantStringETagExpr {
-		t.Errorf("methodWithStringETag.PreconditionExpr mismatch:\ngot:  %q\nwant: %q", gotStringETag.PreconditionExpr, wantStringETagExpr)
-	}
-
-	// 4. Verify request without match fields
-	gotWithout := methodWithout.Codec.(*methodAnnotation)
-	if gotWithout.HasPreconditions {
-		t.Errorf("methodWithout.HasPreconditions = true, want false")
-	}
-	if gotWithout.PreconditionExpr != "" {
-		t.Errorf("methodWithout.PreconditionExpr = %q, want empty", gotWithout.PreconditionExpr)
+	if gotDefault.IdempotencyPredicate != "" {
+		t.Errorf("gotDefault.IdempotencyPredicate = %q, want empty", gotDefault.IdempotencyPredicate)
 	}
 }
 
