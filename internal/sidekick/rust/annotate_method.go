@@ -49,8 +49,8 @@ type methodAnnotation struct {
 	IsBigQueryInsertJob       bool
 	ClientSideStreaming       bool
 	ServerSideStreaming       bool
-	HasIdempotencyPredicate   bool
-	IdempotencyPredicate      string
+	HasIdempotencyHook        bool
+	IdempotencyHook           string
 }
 
 // IsBidiStreaming returns true if the method is a bidirectional streaming RPC.
@@ -337,9 +337,9 @@ func (c *codec) annotateMethod(m *api.Method) (*methodAnnotation, error) {
 		ServerSideStreaming:       m.ServerSideStreaming,
 	}
 
-	if c.idempotencyPredicate != "" {
-		annotation.HasIdempotencyPredicate = true
-		annotation.IdempotencyPredicate = c.idempotencyPredicate
+	if c.idempotencyHook != "" {
+		annotation.HasIdempotencyHook = true
+		annotation.IdempotencyHook = c.idempotencyHook
 	}
 
 	if err := c.annotateResourceNameGeneration(m, annotation); err != nil {

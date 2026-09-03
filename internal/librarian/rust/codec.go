@@ -144,8 +144,8 @@ func buildCodec(library *config.Library, releaseLevel string) map[string]string 
 	if rust.PerServiceFeatures {
 		codec["per-service-features"] = "true"
 	}
-	if rust.IdempotencyPredicate != "" {
-		codec["idempotency-predicate"] = rust.IdempotencyPredicate
+	if rust.IdempotencyHook != "" {
+		codec["idempotency-hook"] = rust.IdempotencyHook
 	}
 	if len(rust.DefaultFeatures) > 0 {
 		codec["default-features"] = strings.Join(rust.DefaultFeatures, ",")
@@ -330,8 +330,8 @@ func buildModuleCodec(library *config.Library, module *config.RustModule) map[st
 	if module.IncludeServerStreamingMethods {
 		codec["include-server-streaming-methods"] = "true"
 	}
-	if module.IdempotencyPredicate != "" {
-		codec["idempotency-predicate"] = module.IdempotencyPredicate
+	if module.IdempotencyHook != "" {
+		codec["idempotency-hook"] = module.IdempotencyHook
 	}
 	detailedTracingAttributes := library.Rust != nil && library.Rust.DetailedTracingAttributes != nil && *library.Rust.DetailedTracingAttributes
 	if module.DetailedTracingAttributes != nil {

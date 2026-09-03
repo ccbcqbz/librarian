@@ -643,35 +643,35 @@ func TestAnnotateMethodIdempotencyPredicate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 1. When idempotency-predicate is configured:
-	codecWithPredicate := newTestCodec(t, libconfig.SpecProtobuf, "storage", map[string]string{
+	// 1. When idempotency-hook is configured:
+	codecWithHook := newTestCodec(t, libconfig.SpecProtobuf, "storage", map[string]string{
 		"include-grpc-only-methods": "true",
-		"idempotency-predicate":     "is_idempotent",
+		"idempotency-hook":          "resolve_idempotency",
 	})
-	if _, err := annotateModel(model, codecWithPredicate); err != nil {
+	if _, err := annotateModel(model, codecWithHook); err != nil {
 		t.Fatal(err)
 	}
 	got := method.Codec.(*methodAnnotation)
-	if !got.HasIdempotencyPredicate {
-		t.Errorf("got.HasIdempotencyPredicate = false, want true")
+	if !got.HasIdempotencyHook {
+		t.Errorf("got.HasIdempotencyHook = false, want true")
 	}
-	if got.IdempotencyPredicate != "is_idempotent" {
-		t.Errorf("got.IdempotencyPredicate = %q, want %q", got.IdempotencyPredicate, "is_idempotent")
+	if got.IdempotencyHook != "resolve_idempotency" {
+		t.Errorf("got.IdempotencyHook = %q, want %q", got.IdempotencyHook, "resolve_idempotency")
 	}
 
-	// 2. When idempotency-predicate is NOT configured:
-	codecWithoutPredicate := newTestCodec(t, libconfig.SpecProtobuf, "storage", map[string]string{
+	// 2. When idempotency-hook is NOT configured:
+	codecWithoutHook := newTestCodec(t, libconfig.SpecProtobuf, "storage", map[string]string{
 		"include-grpc-only-methods": "true",
 	})
-	if _, err := annotateModel(model, codecWithoutPredicate); err != nil {
+	if _, err := annotateModel(model, codecWithoutHook); err != nil {
 		t.Fatal(err)
 	}
 	gotDefault := method.Codec.(*methodAnnotation)
-	if gotDefault.HasIdempotencyPredicate {
-		t.Errorf("gotDefault.HasIdempotencyPredicate = true, want false")
+	if gotDefault.HasIdempotencyHook {
+		t.Errorf("gotDefault.HasIdempotencyHook = true, want false")
 	}
-	if gotDefault.IdempotencyPredicate != "" {
-		t.Errorf("gotDefault.IdempotencyPredicate = %q, want empty", gotDefault.IdempotencyPredicate)
+	if gotDefault.IdempotencyHook != "" {
+		t.Errorf("gotDefault.IdempotencyHook = %q, want empty", gotDefault.IdempotencyHook)
 	}
 }
 
