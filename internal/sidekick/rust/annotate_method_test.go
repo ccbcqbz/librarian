@@ -611,3 +611,68 @@ func TestIsServerStreaming(t *testing.T) {
 		})
 	}
 }
+
+func TestAnnotateMethodIdempotencyPredicate(t *testing.T) {
+	req := &api.Message{
+		Name:    "DeleteObjectRequest",
+		Package: "google.storage.v2",
+		ID:      ".google.storage.v2.DeleteObjectRequest",
+		Fields: []*api.Field{
+			{Name: "bucket", ID: ".google.storage.v2.DeleteObjectRequest.bucket", Typez: api.TypezString},
+			{Name: "object", ID: ".google.storage.v2.DeleteObjectRequest.object", Typez: api.TypezString},
+		},
+	}
+	method := &api.Method{
+		Name:         "DeleteObject",
+		ID:           ".google.storage.v2.Storage.DeleteObject",
+		InputType:    req,
+		InputTypeID:  ".google.storage.v2.DeleteObjectRequest",
+		OutputTypeID: ".google.protobuf.Empty",
+		ReturnsEmpty: true,
+		PathInfo:     &api.PathInfo{},
+	}
+	service := &api.Service{
+		Name:    "Storage",
+		Package: "google.storage.v2",
+		ID:      ".google.storage.v2.Storage",
+		Methods: []*api.Method{method},
+	}
+
+	model := api.NewTestAPI([]*api.Message{req}, []*api.Enum{}, []*api.Service{service})
+	if err := api.CrossReference(model); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. When idempotency-hook is configured:
+	codecWithHook := newTestCodec(t, libconfig.SpecProtobuf, "storage", map[string]string{
+		"include-grpc-only-methods": "true",
+		"idempotency-hook":          "resolve_idempotency",
+	})
+	if _, err := annotateModel(model, codecWithHook); err != nil {
+		t.Fatal(err)
+	}
+	got := method.Codec.(*methodAnnotation)
+	if !got.HasIdempotencyHook {
+		t.Errorf("got.HasIdempotencyHook = false, want true")
+	}
+	if got.IdempotencyHook != "resolve_idempotency" {
+		t.Errorf("got.IdempotencyHook = %q, want %q", got.IdempotencyHook, "resolve_idempotency")
+	}
+
+	// 2. When idempotency-hook is NOT configured:
+	codecWithoutHook := newTestCodec(t, libconfig.SpecProtobuf, "storage", map[string]string{
+		"include-grpc-only-methods": "true",
+	})
+	if _, err := annotateModel(model, codecWithoutHook); err != nil {
+		t.Fatal(err)
+	}
+	gotDefault := method.Codec.(*methodAnnotation)
+	if gotDefault.HasIdempotencyHook {
+		t.Errorf("gotDefault.HasIdempotencyHook = true, want false")
+	}
+	if gotDefault.IdempotencyHook != "" {
+		t.Errorf("gotDefault.IdempotencyHook = %q, want empty", gotDefault.IdempotencyHook)
+	}
+}
+
+
